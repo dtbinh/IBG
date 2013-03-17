@@ -83,6 +83,8 @@ end
 to setup-patches
   ; all patches white
   ask patches [ set pcolor white]
+  ;create gantry zone
+  ask patches with [pycor = 0 or pycor = 1] [set pcolor grey]
   ;create sensing zone
   ask patches with [pycor > 5 or pycor < -5] [set pcolor yellow]
   
@@ -277,8 +279,8 @@ end
 GRAPHICS-WINDOW
 488
 15
-909
-457
+911
+459
 10
 10
 19.7
