@@ -1,37 +1,27 @@
-breed [individuals individual]
-breed [indicators indicator]
+breed [ individuals individual ]
+breed [ indicators indicator ]
 individuals-own [
   conformity 
   preparedness
   patience
   waiting-time
-  ]
-;Patch variables
-;busy? - to check whether the patch is occupied
-patches-own [busy?]
+  pass-gantry?
+]
+patches-own [ busy? ]                                         ;Patch Variable:busy? - to check whether the patch is occupied
 
 globals [
- ;A patch-set of all the gantries
- gantries 
- ;A patch-set of all the green gantries (allowed to enter)
- green-gantries
- ;A patch-set of all the red gantries (not allowed to enter)
- red-gantries
- ;A patch-set of spawning points for individuals
- individual-spawn
- ;Patch set of individual-die points where individuals can leave the model
- individual-die
- ;Radius to locate the nearest empty gantry or the nearest gantry with the shortest queue
- individual-radius
- ;error 1 - the error that occurs when an individual steps into the gantry before the other person has fully crossed the gantry zone
- error1-time
- error1-rate
- ;error 2 - the shorter beep error
- error2-time
- error2-rate
- ;error 3 - the longer beep error
- error3-time
- error3-rate
+  gantries                                                   ;A patch-set of all the gantries 
+  green-gantries                                             ;A patch-set of all the green gantries (allowed to enter)
+  red-gantries                                               ;A patch-set of all the red gantries (not allowed to enter)
+  individual-spawn                                           ;A patch-set of spawning points for individuals
+  individual-die                                             ;Patch set of individual-die points where individuals can leave the model
+  individual-radius                                          ;Radius to locate the nearest empty gantry or the nearest gantry with the shortest queue
+  error1-time                                                ;error 1 - the error that occurs when an individual steps into the gantry before the other person has fully crossed the gantry zone
+  error1-rate                                                ;error 1 - occurance rate
+  error2-time                                                ;error 2 - the shorter beep error
+  error2-rate                                                ;error 2 - occurance rate
+  error3-time                                                ;error 3 - the longer beep error
+  error3-rate                                                ;error 3 - occurance rate
  
 ]
 
@@ -41,16 +31,14 @@ to setup
   resize-my-world
   setup-patches
   if signs
-  [ setup-signs]
+  [ setup-signs ]
   setup-locations
 end
 
 to resize-my-world
- 
-ask patches [ set pcolor white]
+  ask patches [ set pcolor white ]
   let negative-value no-of-gantries - no-of-gantries - no-of-gantries
-  resize-world negative-value no-of-gantries -10 10
-  
+  resize-world negative-value no-of-gantries -10 11
 end
 
 to go
@@ -61,9 +49,8 @@ end
 to setup-individual
   set shape "person"
   ifelse (pycor > 0 )
-  [set color blue set heading 180 ];top part is blue
-  [set color violet set heading 0 ];bottom part is violet
-  
+  [set color blue set heading 180 ]                 ;top part is blue
+  [set color violet set heading 0 ]                 ;bottom part is violet
   set xcor (ceiling xcor)
   set ycor (ceiling ycor)
 end
@@ -75,7 +62,6 @@ to setup-signs
   ask indicators with [pxcor < 0 and pycor = 1] [set heading 180]
   ask indicators with [pxcor > 0 and pycor = 0] [set heading 0]
   ask indicators with [pxcor > 0 and pycor = 1] [set heading 180]
-  ;ask indicators set shape "arrow"
 end
 
 
@@ -86,8 +72,8 @@ to setup-patches
   ;create gantry zone
   ask patches with [pycor = 0 or pycor = 1] [set pcolor grey]
   ;create sensing zone
-  ask patches with [pycor > 5 or pycor < -5] [set pcolor yellow]
-  
+  ask patches with [pycor > 6 or pycor < -5] [set pcolor yellow]
+  ;ask patches [ set plabel pycor ]
   
   ;Set the centre patches black
   ask patches with [pxcor = 1 or pxcor = -1 or pxcor = 0 and (pycor <= 1 and pycor >= 0)][set pcolor black]
@@ -97,28 +83,21 @@ to setup-patches
   
   ; unidirectional gantries
   ifelse direction = "unidirection"[
-  ask patches with [pxcor mod 2 = 0 and pxcor < 0 and pxcor >= (no-of-gantries - no-of-gantries - no-of-gantries) and pycor = 0] [set pcolor green]
-  ask patches with [pxcor mod 2 = 0 and pxcor > 0 and pxcor <= no-of-gantries and pycor = 0] [set pcolor red]
-  ask patches with [pxcor mod 2 = 0 and pxcor < 0 and pxcor >= (no-of-gantries - no-of-gantries - no-of-gantries) and pycor = 1] [set pcolor red]
-  ask patches with [pxcor mod 2 = 0 and pxcor > 0 and pxcor <= no-of-gantries and pycor = 1] [set pcolor green]
-  
- set gantries(patches with [pcolor = green or pcolor = red])
- 
+    ask patches with [pxcor mod 2 = 0 and pxcor > 0 and pxcor <= no-of-gantries and pycor = 0] [set pcolor red]
+    ask patches with [pxcor mod 2 = 0 and pxcor < 0 and pxcor >= (no-of-gantries - no-of-gantries - no-of-gantries) and pycor = 1] [set pcolor red]
   ]
   ;bidirectional gantires
   [
+    ask patches with [pxcor mod 2 = 0 and pxcor > 0 and pxcor <= no-of-gantries and pycor = 0] [set pcolor green]
+    ask patches with [pxcor mod 2 = 0 and pxcor < 0 and pxcor >= (no-of-gantries - no-of-gantries - no-of-gantries) and pycor = 1] [set pcolor green]
+  ]
   ask patches with [pxcor mod 2 = 0 and pxcor < 0 and pxcor >= (no-of-gantries - no-of-gantries - no-of-gantries) and pycor = 0] [set pcolor green]
-  ask patches with [pxcor mod 2 = 0 and pxcor > 0 and pxcor <= no-of-gantries and pycor = 0] [set pcolor green]
-  ask patches with [pxcor mod 2 = 0 and pxcor < 0 and pxcor >= (no-of-gantries - no-of-gantries - no-of-gantries) and pycor = 1] [set pcolor green]
   ask patches with [pxcor mod 2 = 0 and pxcor > 0 and pxcor <= no-of-gantries and pycor = 1] [set pcolor green]
-  
+  ask patches with [pxcor mod 2 = 0 and pxcor < 0 and pxcor >= (no-of-gantries - no-of-gantries - no-of-gantries) and pycor = 0] [set pcolor green]
   set gantries(patches with [pcolor = green or pcolor = red])
-    
-    ]
   
   ;To begin all patches, set their variables busy? ""
   ask patches [set busy? ""]
-  
 end
 
 to setup-locations
@@ -254,18 +233,40 @@ to move [patch-destination]
   
   ;ask all individuals to move fd
   ask individuals[
-    ;check the current location whether agent is at the gantry area
+    ;get the color of the patch
+    let patch-color pcolor
     
+    if (patch-color = yellow) [
+      ifelse (ycor > 0 )
+      [set ycor ycor - 1 ]
+      [set ycor ycor + 1]
+    ]
+    
+    if (patch-color = white) [
+      let counter 0
+      ifelse (color = blue) 
+      [ 
+        set counter (ycor - 1)
+        set patch-color ([pcolor] of patch pxcor 1)
+        ;show [pcolor] of patch pxcor 1
+        ;ask patch-ahead counter [ show pxcor show pycor ] show pxcor show counter show (ycor - 1)  
+      ]
+      [ 
+        set counter (- ycor)
+        set patch-color ([pcolor] of patch pxcor 0)
+        ;show [pcolor] of patch pxcor 0
+        ;ask patch-ahead counter [ show pxcor show pycor ] show pxcor show counter show (- ycor) 
+      ]
+    ]
+    
+    
+    ;check the current location whether agent is at the gantry area
     ;if at gantry, perform tap in/out
     ;else move forward
-   face one-of patches with [pcolor = green]
-   ;;fd random 5
-   ifelse (ycor > 0 )
-   [set ycor ycor - 1 ];top part is blue
-   [set ycor ycor + 1];bottom part is violet
+    ;;face one-of patches with [pcolor = green]
   ]
-  
 end
+
 
 ;The following functions are used to change the busy? variable of a patch appropriately when an agent is arriving or leaving it
 to occupy
@@ -275,14 +276,29 @@ end
 to vacate
   ask patch-here [set busy? ""]
 end
+
+to determine-movement [counter gantry-patch-color]
+  if(gantry-patch-color = green or gantry-patch-color = red)
+  [ ]
+  
+  if(gantry-patch-color = grey)
+  [ ]
+  
+  if(gantry-patch-color = black) 
+  [ ]
+end
+
+
+
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 488
 15
-911
-459
-10
-10
+1069
+479
+14
+-1
 19.7
 1
 10
@@ -293,10 +309,10 @@ GRAPHICS-WINDOW
 1
 1
 1
+-14
+14
 -10
-10
--10
-10
+11
 0
 0
 1
@@ -363,7 +379,7 @@ no-of-gantries
 no-of-gantries
 8
 20
-10
+14
 2
 1
 NIL
@@ -378,7 +394,7 @@ top-max-individuals
 top-max-individuals
 0
 100
-42
+1
 1
 1
 NIL
@@ -393,7 +409,7 @@ bottom-max-individuals
 bottom-max-individuals
 0
 100
-38
+1
 1
 1
 NIL
