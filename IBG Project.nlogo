@@ -7,9 +7,10 @@ individuals-own [
   waiting-time
   pass-gantry?
 ]
-patches-own [ busy? ]                                         ;Patch Variable:busy? - to check whether the patch is occupied
+patches-own [ busy? ]                                        ;Patch Variable:busy? - to check whether the patch is occupied
 
 globals [
+  tick-to-arrival 
   gantries                                                   ;A patch-set of all the gantries 
   green-gantries                                             ;A patch-set of all the green gantries (allowed to enter)
   red-gantries                                               ;A patch-set of all the red gantries (not allowed to enter)
@@ -22,7 +23,7 @@ globals [
   error2-rate                                                ;error 2 - occurance rate
   error3-time                                                ;error 3 - the longer beep error
   error3-rate                                                ;error 3 - occurance rate
- 
+  
 ]
 
 to setup
@@ -43,7 +44,8 @@ end
 
 to go
   spawn-individual
-  move[""]
+  move
+  tick
 end
 
 to setup-individual
@@ -53,11 +55,21 @@ to setup-individual
   [set color violet set heading 0 ]                 ;bottom part is violet
   set xcor (ceiling xcor)
   set ycor (ceiling ycor)
+  set conformity random-float 1
 end
 
 to setup-signs
-  ask patches with [pcolor = green ][ sprout-indicators 1 [set shape "arrow" set color white set size 0.5]]
-  ask patches with [pcolor = red] [sprout-indicators 1 [set shape "x" set color white set size 0.5]]
+  ifelse direction = "unidirection"
+  [
+    ask patches with [pcolor = green ][ sprout-indicators 1 [set shape "arrow" set color white set size 0.5]]
+    ask patches with [pcolor = red] [sprout-indicators 1 [set shape "x" set color white set size 0.5]]
+  ]
+  [
+    ask patches with [pcolor = green and pycor = 0 and pxcor < -1 ] [ sprout-indicators 1 [set shape "arrow" set color white set size 0.5]]
+    ask patches with [pcolor = green and pycor = 1 and pxcor > 1 ] [ sprout-indicators 1 [set shape "arrow" set color white set size 0.5]]
+    ask patches with [pcolor = green and pycor = 1 and pxcor < -1 ] [ sprout-indicators 1 [set shape "x" set color white set size 0.5]]
+    ask patches with [pcolor = green and pycor = 0 and pxcor > 1 ] [ sprout-indicators 1 [set shape "x" set color white set size 0.5]]
+  ]
   ask indicators with [pxcor < 0 and pycor = 0] [set heading 0]
   ask indicators with [pxcor < 0 and pycor = 1] [set heading 180]
   ask indicators with [pxcor > 0 and pycor = 0] [set heading 0]
@@ -68,7 +80,7 @@ end
 
 to setup-patches
   ; all patches white
-  ask patches [ set pcolor white]
+  ask patches [ set pcolor white ]
   ;create gantry zone
   ask patches with [pycor = 0 or pycor = 1] [set pcolor grey]
   ;create sensing zone
@@ -101,21 +113,18 @@ to setup-patches
 end
 
 to setup-locations
-  ;gap is the distance between the spawn point nearest to the gantry and the gantry
-  let gap no-of-gantries / 4
-  let negative-gap gap - gap - gap
   
   ;Patches where individuals can be spawned
   set individual-spawn patches with 
   [
     ;sprawn points at the sides
-    ((pycor <= max-pycor and pycor > gap) or 
-      (pycor >= min-pycor and pycor <= negative-gap) and 
+    ((pycor <= max-pycor and pycor > 6) or 
+      (pycor >= min-pycor and pycor <= -6) and 
       (pxcor = max-pxcor or pxcor = min-pxcor)) or 
-    ;sprawn points top and below
+  ;sprawn points top and below
     ((pxcor <= max-pxcor and pxcor >= min-pxcor) and 
       (pycor = max-pycor or pycor <= min-pycor))
-    ]
+  ]
   
   ;Patches where individuals leave the model
   set individual-die (patches with [pycor > max-pycor or pycor < min-pycor or pxcor > max-pxcor or pxcor < min-pycor])
@@ -142,11 +151,11 @@ to error2-occurs
 end
 
 to error3-occurs
-
+  
 end
 
 to enter-gantry
-
+  
 end
 
 to tap
@@ -159,59 +168,61 @@ to tap
 end
 
 to spawn-individual
-  ;no. of individuals to spawn (0 to 4)
-  let no-of-sprouts random 5
-  
-  let no-of-sprouts-top random 5
-  let no-of-sprouts-bottom random 5
-  
-  ;count existing indivduals at the top
-  let count-individuals count individuals with [color = blue]
-  
-  if (no-of-sprouts-top + count-individuals) > top-max-individuals
-  [set no-of-sprouts-top top-max-individuals - count-individuals ]
-  
-  ;start spawning individuals at the top
-  repeat no-of-sprouts-top
-  [
-    let spawn-patch find-top-free-individual-spot
-    if spawn-patch != nobody
+  if (ticks = tick-to-arrival) [
+    ;no. of individuals to spawn (0 to 4)
+    let no-of-sprouts random 5
+    
+    let no-of-sprouts-top random 5
+    let no-of-sprouts-bottom random 5
+    
+    ;count existing indivduals at the top
+    let count-individuals count individuals with [color = blue]
+    
+    if (no-of-sprouts-top + count-individuals) > top-max-individuals
+    [set no-of-sprouts-top top-max-individuals - count-individuals ]
+    
+    ;start spawning individuals at the top
+    repeat no-of-sprouts-top
     [
-      ask spawn-patch
-      [ 
-        sprout-individuals 1
-        [
-          setup-individual
-          occupy
+      let spawn-patch find-top-free-individual-spot
+      if spawn-patch != nobody
+      [
+        ask spawn-patch
+        [ 
+          sprout-individuals 1
+          [
+            setup-individual
+            occupy
+          ]
         ]
       ]
     ]
-   ]
     
-  
-;count existing indivduals at the bottom
-set count-individuals count individuals with [color = violet]
-
-if (no-of-sprouts-bottom + count-individuals) > bottom-max-individuals
-  [set no-of-sprouts-bottom bottom-max-individuals - count-individuals ]
-  
-  ;start spawning individuals at the bottom
-  repeat no-of-sprouts-bottom
-  [
-    let spawn-patch find-bottom-free-individual-spot
-    if spawn-patch != nobody
+    
+    ;count existing indivduals at the bottom
+    set count-individuals count individuals with [color = violet]
+    
+    if (no-of-sprouts-bottom + count-individuals) > bottom-max-individuals
+    [set no-of-sprouts-bottom bottom-max-individuals - count-individuals ]
+    
+    ;start spawning individuals at the bottom
+    repeat no-of-sprouts-bottom
     [
-    ask spawn-patch
-      [ 
-        sprout-individuals 1
-        [
-          setup-individual
-          occupy
+      let spawn-patch find-bottom-free-individual-spot
+      if spawn-patch != nobody
+      [
+        ask spawn-patch
+        [ 
+          sprout-individuals 1
+          [
+            setup-individual
+            occupy
+          ]
         ]
       ]
     ]
   ]
-  
+  set tick-to-arrival (ticks + 1 + round random-exponential arrival-rate)
 end
 
 to-report find-free-individual-spot
@@ -219,51 +230,117 @@ to-report find-free-individual-spot
 end
 
 to-report find-top-free-individual-spot
-  report one-of individual-spawn with [busy? = "" and pycor > 0]
+  report one-of individual-spawn with [busy? = "" and pycor > 0 and (pxcor < -1 or pxcor > 1) ]
 end
 
 to-report find-bottom-free-individual-spot
-  report one-of individual-spawn with [busy? = "" and pycor < 0]
+  report one-of individual-spawn with [busy? = "" and pycor < 0 and (pxcor < -1 or pxcor > 1) ]
 end
 
 ;To make individuals move
-to move [patch-destination]
-  ;A movement variable will store the decided adjacent patch destination (not diagonals only Up,Down,Left,Right)
-  let Movement "None"
-  
-  ;ask all individuals to move fd
+to move
   ask individuals[
-    ;get the color of the patch
     let patch-color pcolor
     
     if (patch-color = yellow) [
-      ifelse (ycor > 0 )
-      [set ycor ycor - 1 ]
-      [set ycor ycor + 1]
+      if (color = violet) [
+        ifelse direction = "unidirection"
+        [
+          ifelse (xcor > -2) 
+          [ 
+            ;vacate 
+            set xcor xcor - 1 
+            ;occupy 
+          ]
+          [ 
+            ifelse [pcolor] of patch pxcor (pycor + 1) != white 
+            [ set ycor ycor + 1 ]
+            [
+              let counter-limit 0
+              set counter-limit (- ycor)
+              set patch-color ([pcolor] of patch pxcor 0)
+              determine-movement counter-limit patch-color
+            ] 
+          ] 
+        ]
+        [
+          ifelse [pcolor] of patch pxcor (pycor + 1) != white 
+          [ 
+           ; vacate 
+            set ycor ycor + 1 
+            ;occupy 
+          ]
+          [
+            let counter-limit 0
+            set counter-limit (- ycor)
+            set patch-color ([pcolor] of patch pxcor 0)
+            determine-movement counter-limit patch-color
+          ] 
+        ]
+      ]
+      
+      if (color = blue) [
+        ifelse direction = "unidirection"
+        [
+          ifelse (xcor < 2)
+          [ 
+           ; vacate 
+            set xcor xcor + 1 
+           ; occupy 
+          ]
+          [
+            ifelse (ycor > 0)
+            [ 
+            ;  vacate 
+              set ycor ycor - 1 
+            ;  occupy 
+            ]
+            [ 
+              ifelse [pcolor] of patch pxcor (pycor + 1) != white 
+              [ 
+             ;   vacate 
+                set ycor ycor - 1 
+              ;  occupy 
+              ]
+              [
+                let counter-limit 0
+                set counter-limit (ycor - 1)
+                set patch-color ([pcolor] of patch pxcor 1)
+                determine-movement counter-limit patch-color
+              ]
+            ]
+          ] 
+        ]
+        [
+          ifelse [pcolor] of patch pxcor (pycor + 1) != white 
+          [ 
+           ; vacate 
+            set ycor ycor - 1 
+           ; occupy 
+          ]
+          [
+            let counter-limit 0
+            set counter-limit (ycor - 1)
+            set patch-color ([pcolor] of patch pxcor 1)
+            determine-movement counter-limit patch-color
+          ]
+        ]  
+      ]
     ]
     
-    if (patch-color = white) [
-      let counter 0
+    if(patch-color = white) [
+      let counter-limit 0
       ifelse (color = blue) 
       [ 
-        set counter (ycor - 1)
+        set counter-limit (ycor - 1)
         set patch-color ([pcolor] of patch pxcor 1)
-        ;show [pcolor] of patch pxcor 1
-        ;ask patch-ahead counter [ show pxcor show pycor ] show pxcor show counter show (ycor - 1)  
       ]
       [ 
-        set counter (- ycor)
+        set counter-limit (- ycor)
         set patch-color ([pcolor] of patch pxcor 0)
-        ;show [pcolor] of patch pxcor 0
-        ;ask patch-ahead counter [ show pxcor show pycor ] show pxcor show counter show (- ycor) 
       ]
+      determine-movement counter-limit patch-color
     ]
-    
-    
-    ;check the current location whether agent is at the gantry area
-    ;if at gantry, perform tap in/out
-    ;else move forward
-    ;;face one-of patches with [pcolor = green]
   ]
 end
 
@@ -277,27 +354,228 @@ to vacate
   ask patch-here [set busy? ""]
 end
 
-to determine-movement [counter gantry-patch-color]
-  if(gantry-patch-color = green or gantry-patch-color = red)
-  [ ]
+to determine-movement [counter-limit gantry-patch-color]
+  let selected-patch nobody
+  if(gantry-patch-color = green or gantry-patch-color = red) [ 
+    
+    ;determine the search "radius"
+    ;search left and search right
+    let right-count 0
+    let left-count 0
+    
+    ifelse (color = violet)
+    [
+      ;for right side
+      set selected-patch patch (pxcor + 1) 0
+      if((pxcor + 1 < max-pxcor) and [pcolor] of selected-patch != black) [ 
+        let counter 1
+        while [ counter < counter-limit ]
+        [ 
+          if [busy?] of patch (pxcor + 1) (pycor + counter) = "" [ 
+            set right-count (right-count + 1) 
+            set counter (counter + 1) 
+          ]
+        ]
+      ]
+      
+      ;for left side
+      set selected-patch patch (pxcor - 1) 0
+      if((pxcor - 1 > min-pxcor) and [pcolor] of selected-patch != black) [
+        let counter 1
+        while [ counter < counter-limit ]
+        [
+          if [busy?] of patch (pxcor - 1) (pycor + counter) = "" [ 
+            set left-count (left-count + 1) 
+            set counter (counter + 1) 
+          ]
+        ]
+      ]
+      
+      ;compare right and left count
+      if (right-count > left-count ) [
+        vacate 
+        set ycor (ycor + 1) 
+        set xcor (xcor + 1) 
+      ]
+      if (left-count > right-count) [ 
+        vacate 
+        set ycor (ycor + 1) 
+        set xcor (xcor - 1) 
+        ;occupy
+      ]
+      if (left-count = right-count) [ 
+        ifelse random-float 1 < 0.5
+        [ 
+         vacate 
+          set ycor (ycor + 1) 
+          set xcor (xcor + 1) 
+         ; occupy 
+        ] 
+        [ 
+          vacate 
+          set ycor (ycor + 1) 
+          set xcor (xcor - 1) 
+        ;  occupy 
+        ] 
+      ]
+      occupy
+    ]
+    [ 
+      ;for right side
+      set selected-patch patch (pxcor - 1) 1
+      if((pxcor - 1 > min-pxcor) and [pcolor] of selected-patch != black) [
+        let counter 1
+        while [ counter < counter-limit ]
+        [
+          if [busy?] of patch (pxcor - 1) (pycor - counter) = "" [ 
+            set right-count (right-count + 1) 
+            set counter (counter + 1) 
+          ]
+        ]
+      ]
+      
+      ;for left side
+      set selected-patch patch (pxcor + 1) 1
+      if((pxcor + 1 < max-pxcor) and [pcolor] of selected-patch != black) [
+        let counter 1
+        while [ counter < counter-limit ]
+        [
+          if [busy?] of patch (pxcor + 1) (pycor - counter) = "" [ 
+            set left-count (left-count + 1) 
+            set counter (counter + 1) 
+          ]
+        ]
+      ]
+      
+      ;compare right and left count
+      if (right-count > left-count ) [ 
+        ;vacate 
+        set ycor (ycor - 1) 
+        set xcor (xcor - 1) 
+        ;occupy 
+      ]
+      if (left-count > right-count) [ 
+       ; vacate 
+        set ycor (ycor - 1) 
+        set xcor (xcor + 1) 
+      ; occupy 
+      ]
+      if (left-count = right-count) [ 
+        ifelse random-float 1 < 0.5
+        [ 
+       ; vacate 
+          set ycor (ycor - 1) 
+          set xcor (xcor + 1) 
+        ;  occupy 
+        ]
+        [ 
+          set ycor (ycor - 1)
+          set xcor (xcor - 1) 
+        ;  occupy 
+        ] 
+      ]
+    ]        
+  ]
+  
+  
   
   if(gantry-patch-color = grey)
-  [ ]
-  
-  if(gantry-patch-color = black) 
-  [ ]
+  [
+    ;search the current lane, right and left
+    let centre-count 0; 
+    let right-count 0;
+    let left-count 0;
+    
+    ifelse (color = violet)
+    [ 
+      let counter 1
+      while [ counter < counter-limit ]
+      [
+        if [busy?] of patch pxcor (pycor + counter) = "" [ 
+          set centre-count (centre-count + 1) 
+          set counter (counter + 1) 
+        ]
+      ]
+      
+      set selected-patch patch (pxcor + 2) 0
+      if((pxcor + 2 < max-pxcor) and [pcolor] of selected-patch != black) [ 
+        set counter 1
+        while [ counter < counter-limit ]
+        [ 
+          if [busy?] of patch (pxcor + 2) (pycor + counter) = "" [ 
+            set right-count (right-count + 1) 
+            set counter (counter + 1) 
+          ]
+        ]
+      ]
+      
+      set selected-patch patch (pxcor - 2) 0
+      if((pxcor - 2 > min-pxcor) and [pcolor] of selected-patch != black) [
+        set counter 1
+        while [ counter < counter-limit ]
+        [
+          if [busy?] of patch (pxcor - 2) (pycor + counter) = "" [ 
+            set left-count (left-count + 1) 
+            set counter (counter + 1) 
+          ]
+        ]
+      ]
+      
+      if (centre-count >= right-count or centre-count >= left-count) [ 
+        ;vacate 
+        set ycor (ycor + 1) 
+       ;occupy 
+      ]
+    ]
+    [ 
+      let counter 1
+      while [ counter < counter-limit ]
+      [
+        if [busy?] of patch pxcor (pycor - counter) = "" [ 
+          set centre-count (centre-count + 1) 
+          set counter (counter + 1) 
+        ]
+      ]
+      
+      set selected-patch patch (pxcor -  2) 1
+      if((pxcor - 2 < min-pxcor) and [pcolor] of selected-patch != black) [
+        set counter 1
+        while [ counter < counter-limit ]
+        [
+          if [busy?] of patch (pxcor - 2) (pycor - counter) = "" [ 
+            set right-count (right-count + 1) 
+            set counter (counter + 1) 
+          ]
+        ]
+      ]
+      
+      set selected-patch patch (pxcor + 2) 1
+      if((pxcor + 2 < max-pxcor) and [pcolor] of selected-patch != black) [
+        set counter 1
+        while [ counter < counter-limit ]
+        [
+          if [busy?] of patch (pxcor + 2) (pycor - counter) = "" [ 
+            set left-count (left-count + 1) 
+            set counter (counter + 1) 
+          ]
+        ]
+      ]
+      
+      if (centre-count >= right-count or centre-count >= left-count) [ 
+        ;vacate 
+        set ycor (ycor - 1) 
+      ;  occupy 
+      ]
+    ]
+  ]
 end
-
-
-
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 488
 15
-1069
+1148
 479
-14
+16
 -1
 19.7
 1
@@ -309,8 +587,8 @@ GRAPHICS-WINDOW
 1
 1
 1
--14
-14
+-16
+16
 -10
 11
 0
@@ -379,7 +657,7 @@ no-of-gantries
 no-of-gantries
 8
 20
-14
+16
 2
 1
 NIL
@@ -394,7 +672,7 @@ top-max-individuals
 top-max-individuals
 0
 100
-1
+100
 1
 1
 NIL
@@ -409,21 +687,21 @@ bottom-max-individuals
 bottom-max-individuals
 0
 100
-1
+100
 1
 1
 NIL
 HORIZONTAL
 
 CHOOSER
-217
+218
 72
-355
+356
 117
-Direction
-Direction
+direction
+direction
 "unidirection" "bidirection"
-0
+1
 
 SWITCH
 369
@@ -435,6 +713,36 @@ Signs
 0
 1
 -1000
+
+SLIDER
+20
+219
+192
+252
+society-conformity
+society-conformity
+0
+1
+0.3
+0.01
+1
+NIL
+HORIZONTAL
+
+SLIDER
+20
+261
+192
+294
+arrival-rate
+arrival-rate
+1
+10
+10
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
