@@ -242,20 +242,26 @@ to move
   ask individuals[
     let patch-color pcolor
     
+    ;; Check the current patch color
     if (patch-color = yellow) [
       if (color = violet) [
         ifelse direction = "unidirection"
         [
           ifelse (xcor > -2) 
           [ 
-            ;vacate 
+            vacate 
             set xcor xcor - 1 
-            ;occupy 
+            occupy 
           ]
           [ 
             ifelse [pcolor] of patch pxcor (pycor + 1) != white 
-            [ set ycor ycor + 1 ]
+            [ 
+              vacate
+              set ycor ycor + 1 
+              occupy
+            ]
             [
+              occupy
               let counter-limit 0
               set counter-limit (- ycor)
               set patch-color ([pcolor] of patch pxcor 0)
@@ -266,11 +272,12 @@ to move
         [
           ifelse [pcolor] of patch pxcor (pycor + 1) != white 
           [ 
-           ; vacate 
+            vacate 
             set ycor ycor + 1 
-            ;occupy 
+            occupy 
           ]
           [
+            occupy
             let counter-limit 0
             set counter-limit (- ycor)
             set patch-color ([pcolor] of patch pxcor 0)
@@ -284,25 +291,26 @@ to move
         [
           ifelse (xcor < 2)
           [ 
-           ; vacate 
+            vacate 
             set xcor xcor + 1 
-           ; occupy 
+            occupy 
           ]
           [
             ifelse (ycor > 0)
             [ 
-            ;  vacate 
+              vacate 
               set ycor ycor - 1 
-            ;  occupy 
+              occupy 
             ]
             [ 
               ifelse [pcolor] of patch pxcor (pycor + 1) != white 
               [ 
-             ;   vacate 
+                vacate 
                 set ycor ycor - 1 
-              ;  occupy 
+                occupy 
               ]
               [
+                occupy
                 let counter-limit 0
                 set counter-limit (ycor - 1)
                 set patch-color ([pcolor] of patch pxcor 1)
@@ -314,11 +322,12 @@ to move
         [
           ifelse [pcolor] of patch pxcor (pycor + 1) != white 
           [ 
-           ; vacate 
+            vacate 
             set ycor ycor - 1 
-           ; occupy 
+            occupy 
           ]
           [
+            occupy
             let counter-limit 0
             set counter-limit (ycor - 1)
             set patch-color ([pcolor] of patch pxcor 1)
@@ -329,6 +338,14 @@ to move
     ]
     
     if(patch-color = white) [
+      
+      ; For queuing, not working yet
+      ;let my-counter 1
+      ;while [[busy?] of patch pxcor (pycor + my-counter) = "" and pycor + my-counter < 0]
+        ;[set my-counter (my-counter + 1) show pycor + my-counter]
+      ;let counter-limit my-counter
+      ;show my-counter
+      
       let counter-limit 0
       ifelse (color = blue) 
       [ 
@@ -367,9 +384,11 @@ to determine-movement [counter-limit gantry-patch-color]
     [
       ;for right side
       set selected-patch patch (pxcor + 1) 0
+      
       if((pxcor + 1 < max-pxcor) and [pcolor] of selected-patch != black) [ 
         let counter 1
-        while [ counter < counter-limit ]
+        ;while [ counter < counter-limit ]
+        while [ counter < counter-limit and [busy?] of patch (pxcor + 1) (pycor + counter) = ""]
         [ 
           if [busy?] of patch (pxcor + 1) (pycor + counter) = "" [ 
             set right-count (right-count + 1) 
@@ -382,7 +401,7 @@ to determine-movement [counter-limit gantry-patch-color]
       set selected-patch patch (pxcor - 1) 0
       if((pxcor - 1 > min-pxcor) and [pcolor] of selected-patch != black) [
         let counter 1
-        while [ counter < counter-limit ]
+        while [ counter < counter-limit and [busy?] of patch (pxcor - 1) (pycor + counter) = "" ]
         [
           if [busy?] of patch (pxcor - 1) (pycor + counter) = "" [ 
             set left-count (left-count + 1) 
@@ -395,37 +414,42 @@ to determine-movement [counter-limit gantry-patch-color]
       if (right-count > left-count ) [
         vacate 
         set ycor (ycor + 1) 
+        vacate
         set xcor (xcor + 1) 
+        occupy
       ]
       if (left-count > right-count) [ 
         vacate 
         set ycor (ycor + 1) 
+        vacate
         set xcor (xcor - 1) 
-        ;occupy
+        occupy
       ]
       if (left-count = right-count) [ 
         ifelse random-float 1 < 0.5
         [ 
-         vacate 
+          vacate 
           set ycor (ycor + 1) 
+          vacate
           set xcor (xcor + 1) 
-         ; occupy 
+          occupy 
         ] 
         [ 
           vacate 
           set ycor (ycor + 1) 
+          vacate
           set xcor (xcor - 1) 
-        ;  occupy 
+          occupy 
         ] 
       ]
-      occupy
+      ;occupy
     ]
     [ 
       ;for right side
       set selected-patch patch (pxcor - 1) 1
       if((pxcor - 1 > min-pxcor) and [pcolor] of selected-patch != black) [
         let counter 1
-        while [ counter < counter-limit ]
+        while [ counter < counter-limit and [busy?] of patch (pxcor - 1) (pycor - counter) = ""]
         [
           if [busy?] of patch (pxcor - 1) (pycor - counter) = "" [ 
             set right-count (right-count + 1) 
@@ -438,7 +462,7 @@ to determine-movement [counter-limit gantry-patch-color]
       set selected-patch patch (pxcor + 1) 1
       if((pxcor + 1 < max-pxcor) and [pcolor] of selected-patch != black) [
         let counter 1
-        while [ counter < counter-limit ]
+        while [ counter < counter-limit and [busy?] of patch (pxcor + 1) (pycor - counter) = ""]
         [
           if [busy?] of patch (pxcor + 1) (pycor - counter) = "" [ 
             set left-count (left-count + 1) 
@@ -449,29 +473,34 @@ to determine-movement [counter-limit gantry-patch-color]
       
       ;compare right and left count
       if (right-count > left-count ) [ 
-        ;vacate 
+        vacate 
         set ycor (ycor - 1) 
+        vacate
         set xcor (xcor - 1) 
-        ;occupy 
+        occupy 
       ]
       if (left-count > right-count) [ 
-       ; vacate 
+        vacate 
         set ycor (ycor - 1) 
+        vacate
         set xcor (xcor + 1) 
-      ; occupy 
+        occupy 
       ]
       if (left-count = right-count) [ 
         ifelse random-float 1 < 0.5
         [ 
-       ; vacate 
+          vacate 
           set ycor (ycor - 1) 
+          vacate
           set xcor (xcor + 1) 
-        ;  occupy 
+          occupy 
         ]
         [ 
+          vacate
           set ycor (ycor - 1)
+          vacate
           set xcor (xcor - 1) 
-        ;  occupy 
+          occupy 
         ] 
       ]
     ]        
@@ -481,6 +510,7 @@ to determine-movement [counter-limit gantry-patch-color]
   
   if(gantry-patch-color = grey)
   [
+    vacate
     ;search the current lane, right and left
     let centre-count 0; 
     let right-count 0;
@@ -489,7 +519,7 @@ to determine-movement [counter-limit gantry-patch-color]
     ifelse (color = violet)
     [ 
       let counter 1
-      while [ counter < counter-limit ]
+      while [ counter < counter-limit and [busy?] of patch pxcor (pycor + counter) = ""]
       [
         if [busy?] of patch pxcor (pycor + counter) = "" [ 
           set centre-count (centre-count + 1) 
@@ -500,7 +530,7 @@ to determine-movement [counter-limit gantry-patch-color]
       set selected-patch patch (pxcor + 2) 0
       if((pxcor + 2 < max-pxcor) and [pcolor] of selected-patch != black) [ 
         set counter 1
-        while [ counter < counter-limit ]
+        while [ counter < counter-limit and [busy?] of patch (pxcor + 2) (pycor + counter) = ""]
         [ 
           if [busy?] of patch (pxcor + 2) (pycor + counter) = "" [ 
             set right-count (right-count + 1) 
@@ -512,7 +542,7 @@ to determine-movement [counter-limit gantry-patch-color]
       set selected-patch patch (pxcor - 2) 0
       if((pxcor - 2 > min-pxcor) and [pcolor] of selected-patch != black) [
         set counter 1
-        while [ counter < counter-limit ]
+        while [ counter < counter-limit and [busy?] of patch (pxcor - 2) (pycor + counter) = ""]
         [
           if [busy?] of patch (pxcor - 2) (pycor + counter) = "" [ 
             set left-count (left-count + 1) 
@@ -522,9 +552,9 @@ to determine-movement [counter-limit gantry-patch-color]
       ]
       
       if (centre-count >= right-count or centre-count >= left-count) [ 
-        ;vacate 
+        vacate 
         set ycor (ycor + 1) 
-       ;occupy 
+        occupy 
       ]
     ]
     [ 
@@ -562,9 +592,9 @@ to determine-movement [counter-limit gantry-patch-color]
       ]
       
       if (centre-count >= right-count or centre-count >= left-count) [ 
-        ;vacate 
+        vacate 
         set ycor (ycor - 1) 
-      ;  occupy 
+        occupy 
       ]
     ]
   ]
@@ -598,9 +628,9 @@ ticks
 30.0
 
 BUTTON
-20
+22
 21
-86
+88
 54
 NIL
 setup
@@ -672,7 +702,7 @@ top-max-individuals
 top-max-individuals
 0
 100
-100
+0
 1
 1
 NIL
@@ -701,7 +731,7 @@ CHOOSER
 direction
 direction
 "unidirection" "bidirection"
-1
+0
 
 SWITCH
 369
