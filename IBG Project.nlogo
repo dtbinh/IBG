@@ -5,6 +5,7 @@ individuals-own [
   preparedness
   patience
   waiting-time
+  switched-lane?                                             ;To check whether the agent has already switched to a less crowded lane
   pass-gantry?
 ]
 patches-own [ busy? ]                                        ;Patch Variable:busy? - to check whether the patch is occupied
@@ -55,6 +56,7 @@ to setup-individual
   [set color violet set heading 0 ]                 ;bottom part is violet
   set xcor (ceiling xcor)
   set ycor (ceiling ycor)
+  set switched-lane? false
   set conformity random-float 1
 end
 
@@ -313,6 +315,7 @@ to move
                 occupy
                 let counter-limit 0
                 set counter-limit (ycor - 1)
+                ;show counter-limit
                 set patch-color ([pcolor] of patch pxcor 1)
                 determine-movement counter-limit patch-color
               ]
@@ -339,36 +342,59 @@ to move
     
     if(patch-color = white) [
       
-      ; For queuing, not working yet
-      ;let my-counter 1
-      ;while [[busy?] of patch pxcor (pycor + my-counter) = "" and pycor + my-counter < 0]
-        ;[set my-counter (my-counter + 1) show pycor + my-counter]
-      ;let counter-limit my-counter
-      ;show my-counter
-      
       let counter-limit 0
+      ;let my-counter 1
+      ;while [[busy?] of patch pxcor (pycor + my-counter) != "" and pycor < 0]
+      ;[
+      ; set counter-limit counter-limit + 1
+      ; set my-counter my-counter + 1
+      ;]
+      
+      
+      
       ifelse (color = blue) 
       [ 
         set counter-limit (ycor - 1)
         set patch-color ([pcolor] of patch pxcor 1)
       ]
       [ 
-        set counter-limit (- ycor)
+        ;set counter-limit (- ycor)
+        ifelse ([busy?] of patch pxcor 0 != "")
+        [
+          let my-counter 0
+          
+          while [my-counter < 4 and [busy?] of patch pxcor (- my-counter) != ""]
+          [
+            if ([busy?] of patch pxcor (- my-counter) != "")
+            [
+              set my-counter my-counter + 1
+              set counter-limit counter-limit + 1
+            ]
+          ]
+          ;show "HAHA"
+          ;show [busy?] of patch pxcor (- my-counter)
+          ;while [[busy?] of patch pxcor (- my-counter) = ""]
+          ;[
+            ;set my-counter my-counter + 1
+           ; show "B"
+          ;]
+          
+          ;set counter-limit (- my-counter)
+          show (word " limit " counter-limit)
+        ]
+        [
+          set counter-limit (- ycor)
+        ]
+        
+        ;ifelse ([busy?] of patch pxcor (pycor + 1) = "")
+        ;[set counter-limit 1] ;; There's nobody in front
+        ;[set counter-limit 0] ;; There's someone in front
+        ;set counter-limit (- ycor)
         set patch-color ([pcolor] of patch pxcor 0)
       ]
       determine-movement counter-limit patch-color
     ]
   ]
-end
-
-
-;The following functions are used to change the busy? variable of a patch appropriately when an agent is arriving or leaving it
-to occupy
-  ask patch-here [set busy? "Yes"]
-end
-
-to vacate
-  ask patch-here [set busy? ""]
 end
 
 to determine-movement [counter-limit gantry-patch-color]
@@ -410,6 +436,8 @@ to determine-movement [counter-limit gantry-patch-color]
         ]
       ]
       
+      ;show  (word " right " right-count " left " left-count)
+      
       ;compare right and left count
       if (right-count > left-count ) [
         vacate 
@@ -447,9 +475,10 @@ to determine-movement [counter-limit gantry-patch-color]
     [ 
       ;for right side
       set selected-patch patch (pxcor - 1) 1
+      
       if((pxcor - 1 > min-pxcor) and [pcolor] of selected-patch != black) [
         let counter 1
-        while [ counter < counter-limit and [busy?] of patch (pxcor - 1) (pycor - counter) = ""]
+        while [ counter < counter-limit]
         [
           if [busy?] of patch (pxcor - 1) (pycor - counter) = "" [ 
             set right-count (right-count + 1) 
@@ -462,7 +491,7 @@ to determine-movement [counter-limit gantry-patch-color]
       set selected-patch patch (pxcor + 1) 1
       if((pxcor + 1 < max-pxcor) and [pcolor] of selected-patch != black) [
         let counter 1
-        while [ counter < counter-limit and [busy?] of patch (pxcor + 1) (pycor - counter) = ""]
+        while [ counter < counter-limit]
         [
           if [busy?] of patch (pxcor + 1) (pycor - counter) = "" [ 
             set left-count (left-count + 1) 
@@ -472,14 +501,14 @@ to determine-movement [counter-limit gantry-patch-color]
       ]
       
       ;compare right and left count
-      if (right-count > left-count ) [ 
+      ifelse (right-count > left-count ) [ 
         vacate 
         set ycor (ycor - 1) 
         vacate
         set xcor (xcor - 1) 
         occupy 
       ]
-      if (left-count > right-count) [ 
+      [ 
         vacate 
         set ycor (ycor - 1) 
         vacate
@@ -510,7 +539,7 @@ to determine-movement [counter-limit gantry-patch-color]
   
   if(gantry-patch-color = grey)
   [
-    vacate
+    ;vacate
     ;search the current lane, right and left
     let centre-count 0; 
     let right-count 0;
@@ -551,10 +580,36 @@ to determine-movement [counter-limit gantry-patch-color]
         ]
       ]
       
-      if (centre-count >= right-count or centre-count >= left-count) [ 
+      
+      ifelse ((centre-count >= right-count or centre-count >= left-count) and ([busy?] of patch pxcor (pycor + 1) = "")) [ 
+        ;show "A"
+        ;; Enter the current-facing gantry
         vacate 
         set ycor (ycor + 1) 
         occupy 
+      ][
+      ;show  (word " right " right-count " left " left-count)
+      ;; Decide which gantry to enter
+        if ((right-count > left-count) and switched-lane? = false)
+        [ 
+          show "C"
+          set switched-lane? true
+          vacate 
+          set ycor (ycor - 1) 
+          vacate
+          set xcor (xcor + 2) 
+          occupy 
+        ]
+        if ((right-count < left-count) and switched-lane? = false)
+        [ 
+          show "D"
+          set switched-lane? true
+          vacate
+          set ycor (ycor - 1)
+          vacate
+          set xcor (xcor - 2) 
+          occupy 
+        ] 
       ]
     ]
     [ 
@@ -570,7 +625,7 @@ to determine-movement [counter-limit gantry-patch-color]
       set selected-patch patch (pxcor -  2) 1
       if((pxcor - 2 < min-pxcor) and [pcolor] of selected-patch != black) [
         set counter 1
-        while [ counter < counter-limit ]
+        while [ counter < counter-limit and [busy?] of patch (pxcor - 2) (pycor - counter) = ""]
         [
           if [busy?] of patch (pxcor - 2) (pycor - counter) = "" [ 
             set right-count (right-count + 1) 
@@ -582,7 +637,7 @@ to determine-movement [counter-limit gantry-patch-color]
       set selected-patch patch (pxcor + 2) 1
       if((pxcor + 2 < max-pxcor) and [pcolor] of selected-patch != black) [
         set counter 1
-        while [ counter < counter-limit ]
+        while [ counter < counter-limit and [busy?] of patch (pxcor + 2) (pycor - counter) = ""]
         [
           if [busy?] of patch (pxcor + 2) (pycor - counter) = "" [ 
             set left-count (left-count + 1) 
@@ -599,13 +654,22 @@ to determine-movement [counter-limit gantry-patch-color]
     ]
   ]
 end
+
+;The following functions are used to change the busy? variable of a patch appropriately when an agent is arriving or leaving it
+to occupy
+  ask patch-here [set busy? "Yes"]
+end
+
+to vacate
+  ask patch-here [set busy? ""]
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 488
 15
-1148
+1305
 479
-16
+20
 -1
 19.7
 1
@@ -617,8 +681,8 @@ GRAPHICS-WINDOW
 1
 1
 1
--16
-16
+-20
+20
 -10
 11
 0
@@ -687,7 +751,7 @@ no-of-gantries
 no-of-gantries
 8
 20
-16
+20
 2
 1
 NIL
@@ -717,7 +781,7 @@ bottom-max-individuals
 bottom-max-individuals
 0
 100
-100
+15
 1
 1
 NIL
@@ -740,7 +804,7 @@ SWITCH
 112
 Signs
 Signs
-0
+1
 1
 -1000
 
@@ -768,7 +832,7 @@ arrival-rate
 arrival-rate
 1
 10
-10
+9
 1
 1
 NIL
